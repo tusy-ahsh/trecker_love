@@ -167,6 +167,7 @@
   }
   td.day-cell { text-align: center; min-width: 64px; }
   td.today-cell { background: var(--accent-soft) !important; }
+  td.selected-cell { background: rgba(92,122,94,0.12) !important; }
 
   /* CHECK BUTTON */
   .check-btn {
@@ -329,12 +330,12 @@
   .modal-step { font-family: 'Montserrat', sans-serif; font-size: 10px; font-weight: 700; color: var(--choco3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
   .modal-label { font-family: 'Montserrat', sans-serif; font-size: 22px; font-weight: 600; color: var(--choco); margin-bottom: 20px; line-height: 1.2; letter-spacing: -0.01em; }
 
-  .modal-check-row { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+  .modal-check-row { display: flex; gap: 8px; margin-bottom: 24px; }
   .modal-check-btn {
-    flex: 1; min-width: 80px; padding: 14px 10px; border-radius: var(--radius-sm); border: 1.5px solid var(--border2);
-    background: var(--surface2); font-family: 'Montserrat', sans-serif; font-size: 13px; font-weight: 600;
+    flex: 1; padding: 14px 6px; border-radius: var(--radius-sm); border: 1.5px solid var(--border2);
+    background: var(--surface2); font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 600;
     cursor: pointer; transition: all 0.15s; color: var(--text2);
-    box-shadow: var(--shadow-sm); text-align: center;
+    box-shadow: var(--shadow-sm); text-align: center; white-space: nowrap;
   }
   .modal-check-btn.selected-yes { background: var(--done-bg); border-color: var(--done-bg); color: white; box-shadow: 0 4px 12px rgba(92,122,94,0.35); }
   .modal-check-btn.selected-half { background: var(--half-bg); border-color: var(--half-bg); color: white; box-shadow: 0 4px 12px rgba(212,168,90,0.35); }
@@ -567,6 +568,7 @@ const DAY_NAMES = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
 const MONTH_NAMES = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 
 let weekOffset = 0, currentTab = 'tracker', currentPeriod = 'week';
+let selectedDk = dateKey(new Date()); // default = today
 let data = {};
 try { data = JSON.parse(localStorage.getItem('askarTrackerData') || '{}'); } catch(e) {}
 
@@ -658,8 +660,13 @@ function switchPeriod(period, el) {
   renderProgress();
 }
 
+function selectDate(dk) {
+  selectedDk = dk;
+  renderTracker(getWeekDates(weekOffset));
+}
+
 function shiftWeek(dir) { weekOffset+=dir; render(); }
-function goToday() { weekOffset=0; render(); }
+function goToday() { weekOffset=0; selectedDk=dateKey(new Date()); render(); }
 
 // Deterministic question by date
 function getValueQ(dk) {
@@ -675,7 +682,10 @@ function renderTracker(days) {
   days.forEach(d => {
     const tc=isToday(d)?' today-cell':'';
     const bold=isToday(d)?'font-weight:600;color:#5C7A5E;':'';
-    html+='<th class="'+tc+'" style="'+bold+'">'+DAY_NAMES[d.getDay()]+'<br><span style="font-size:12px;font-weight:400">'+d.getDate()+'.'+String(d.getMonth()+1).padStart(2,'0')+'</span></th>';
+    const dk=dateKey(d);
+    const isSelected=dk===selectedDk;
+    const selStyle=isSelected?'background:rgba(92,122,94,0.18);border-radius:var(--radius-xs) var(--radius-xs) 0 0;outline:2px solid var(--accent);outline-offset:-2px;':'';
+    html+='<th class="'+tc+'" style="'+bold+selStyle+'cursor:pointer;" onclick="selectDate(\''+dk+'\')" >'+DAY_NAMES[d.getDay()]+'<br><span style="font-size:12px;font-weight:400">'+d.getDate()+'.'+String(d.getMonth()+1).padStart(2,'0')+'</span></th>';
   });
   html+='</tr></thead><tbody>';
 
@@ -685,7 +695,7 @@ function renderTracker(days) {
     days.forEach(d => {
       const dk=dateKey(d);
       const val=data[dk]?data[dk][p.key]:null;
-      const tc=isToday(d)?' today-cell':'';
+      const tc=isToday(d)?' today-cell':(dk===selectedDk?' selected-cell':'');
       html+='<td class="day-cell'+tc+'">';
 
       if (p.type==='check3') {
@@ -957,7 +967,8 @@ function renderProgress() {
     chartHtml+='<div style="position:relative;width:24px;flex-shrink:0;height:'+(H+16)+'px">';
     gridLines.forEach(gv => {
       const bot=Math.round((gv/maxV)*H);
-      chartHtml+='<div style="position:absolute;bottom:'+(bot+16-5)+'px;right:2px;font-size:8px;color:var(--text3);font-weight:500;line-height:1">'+gv+'</div>';
+      const fs=currentPeriod==='month'?'6':'8';
+      chartHtml+='<div style="position:absolute;bottom:'+(bot+16-5)+'px;right:2px;font-size:'+fs+'px;color:var(--text3);font-weight:500;line-height:1">'+gv+'</div>';
     });
     chartHtml+='</div>';
     // Chart body
@@ -1050,10 +1061,24 @@ const QUICK_PARAMS = PARAMS.filter(p => p.key);
 let quickIdx=0, quickDk='';
 
 function openQuick() {
-  quickDk=dateKey(new Date());
+  quickDk = selectedDk;
   quickIdx=0;
   document.getElementById('modalOverlay').classList.remove('hidden');
   renderQuickStep();
+}
+
+function openQuickForDate(dk) {
+  quickDk=dk;
+  quickIdx=0;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+  // Show date in modal header
+  const parts=dk.split('-');
+  const label=parts[2]+'.'+parts[1]+'.'+parts[0];
+  document.getElementById('modalOverlay').querySelector('.modal-step').textContent='';
+  renderQuickStep();
+  // Update step label to show date
+  const stepEl=document.getElementById('modalStep');
+  stepEl.textContent='1 / '+QUICK_PARAMS.length+' · '+label;
 }
 
 function closeQuick() {
@@ -1066,7 +1091,10 @@ function renderQuickStep() {
   const isLast=quickIdx===total-1;
 
   document.getElementById('modalProgressFill').style.width=Math.round(((quickIdx)/total)*100)+'%';
-  document.getElementById('modalStep').textContent=(quickIdx+1)+' / '+total;
+  // Show date if not today
+  const todayDk=dateKey(new Date());
+  const dateSuffix=quickDk!==todayDk?' · '+quickDk.split('-').reverse().join('.'):'';
+  document.getElementById('modalStep').textContent=(quickIdx+1)+' / '+total+dateSuffix;
   document.getElementById('modalNextBtn').textContent=isLast?'Готово':'Далее';
   document.getElementById('modalLabel').textContent=p.label;
 
