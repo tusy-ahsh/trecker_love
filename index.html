@@ -422,7 +422,17 @@ let weekOffset = 0, currentTab = 'actual', currentPeriod = 'week';
 let selectedDk = dateKey(new Date());
 let actualDayOffset = 0;
 let data = {};
-try { data = JSON.parse(localStorage.getItem('askarTrackerData2') || '{}'); } catch(e) {}
+try {
+  // Читаем новый ключ
+  const newData = JSON.parse(localStorage.getItem('askarTrackerData2') || '{}');
+  // Читаем старый ключ и объединяем
+  const oldData = JSON.parse(localStorage.getItem('askarTrackerData') || '{}');
+  data = Object.assign({}, oldData, newData);
+  // Если нашли старые данные — сохраняем в новый ключ
+  if (Object.keys(oldData).length > 0) {
+    localStorage.setItem('askarTrackerData2', JSON.stringify(data));
+  }
+} catch(e) {}
 
 function dateKey(d) {
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
